@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environments
+.venv/
+env/
+venv/
+
+# Editors / IDE
+.vscode/
+.idea/
+
+# macOS cruft
+.DS_Store
