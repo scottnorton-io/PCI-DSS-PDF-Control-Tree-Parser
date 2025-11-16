@@ -11,11 +11,13 @@ in YAML (default) or JSON format.
 - Outputs YAML with a standard PCI DSS header or structured JSON.
 
 Usage:
-    python3 pci_dss_parser.py path/to/PCI-DSS-v4_0_1.pdf -f yaml -o controls.yaml
+    python3 -m pci_dss_pdf_control_tree_parser.pci_dss_parser \
+        path/to/PCI-DSS-v4_0_1.pdf -f yaml -o controls.yaml
+
+All outputs are "Draft – AI Assisted" and must be reviewed by a qualified assessor.
 """
 
 import argparse
-import itertools
 import json
 import os
 import re
@@ -55,8 +57,15 @@ controls:
 # ---------------------------------------------------------------------------
 
 class ComplianceControlNode:
-    """
-    Represents one PCI DSS requirement node in the control tree.
+    """Represents one PCI DSS requirement node in the control tree.
+
+    Attributes:
+        raw_blob: The full raw text blob for the requirement.
+        id: Parsed requirement ID (e.g., "1.1.1", "A2.1.3") or None.
+        title: Cleaned, single-line title for the requirement.
+        parent: Parent node in the hierarchy (None for root).
+        children: Child requirement nodes.
+        depth: Depth in the tree (root depth = 0).
     """
 
     # Patterns used to separate title text from trailing notes/clauses.
@@ -106,15 +115,11 @@ class ComplianceControlNode:
         blob: str,
         root: Optional["ComplianceControlNode"] = None
     ) -> "ComplianceControlNode":
-        """
-        Factory method to build a node from a requirement blob.
-        """
+        """Factory method to build a node from a requirement blob."""
         return cls(raw_blob=blob, root=root)
 
     def _parse_id_and_title(self) -> None:
-        """
-        Extract the requirement ID and cleaned title from the raw blob.
-        """
+        """Extract the requirement ID and cleaned title from the raw blob."""
         text = self.raw_blob.strip()
         if not text:
             return
@@ -141,13 +146,12 @@ class ComplianceControlNode:
         self.title = cleaned
 
     def add_child(self, node: "ComplianceControlNode") -> None:
+        """Attach a child node to this node."""
         self.children.append(node)
         node.parent = self
 
     def to_dict(self) -> dict:
-        """
-        Convert node (and its children) into a serializable dictionary.
-        """
+        """Convert node (and its children) into a serializable dictionary."""
         return {
             "id": self.id,
             "title": self.title,
@@ -156,9 +160,9 @@ class ComplianceControlNode:
 
 
 class ComplianceControlTree:
-    """
-    Represents the entire control tree. Uses ID segment depth to build the
-    hierarchy (1 → 1.1 → 1.1.1, A1 → A1.1, etc.).
+    """Represents the entire control tree built from requirement blobs.
+
+    Uses ID segment depth to build the hierarchy (1 → 1.1 → 1.1.1, A1 → A1.1, etc.).
     """
 
     def __init__(self) -> None:
@@ -169,9 +173,7 @@ class ComplianceControlTree:
         self.last_by_depth: dict[int, ComplianceControlNode] = {0: self.root}
 
     def add_node_from_blob(self, blob: str) -> None:
-        """
-        Create a node from the given blob and attach it to the tree based on ID depth.
-        """
+        """Create a node from the given blob and attach it to the tree based on ID depth."""
         node = ComplianceControlNode.from_blob(blob, root=self.root)
 
         if not node.id:
@@ -189,9 +191,7 @@ class ComplianceControlTree:
         self.last_by_depth[depth] = node
 
     def to_dict(self) -> List[dict]:
-        """
-        Represent the tree as a list of children (root-level requirements).
-        """
+        """Represent the tree as a list of children (root-level requirements)."""
         return [child.to_dict() for child in self.root.children]
 
 
@@ -200,9 +200,7 @@ class ComplianceControlTree:
 # ---------------------------------------------------------------------------
 
 class YamlFormatter:
-    """
-    Renders the ComplianceControlTree as YAML, including the header template.
-    """
+    """Renders the ComplianceControlTree as YAML, including the header template."""
 
     def __init__(
         self,
@@ -215,32 +213,24 @@ class YamlFormatter:
         self.indent = indent
 
     def format(self) -> str:
-        """
-        Return full YAML text as a single string.
-        """
+        """Return full YAML text as a single string."""
         lines: List[str] = [HEADER_TEMPLATE.rstrip()]
         for child in self.root.children:
             self._walk(child, lines)
         return "\n".join(lines)
 
     def _walk(self, node: ComplianceControlNode, lines: List[str]) -> None:
-        """
-        Depth-first traversal to append lines for each node.
-        """
+        """Depth-first traversal to append lines for each node."""
         lines.extend(self._format_node(node))
         for child in node.children:
             self._walk(child, lines)
 
     def _wrap_title(self, title: str, depth: int) -> str:
-        """
-        Wrap title text with proper indentation and width.
-        """
+        """Wrap title text with proper indentation and width."""
         if not title:
             return ""
 
-        # Base indentation for the node line (e.g., "  - id: ...")
         node_indent = self.indent * depth
-        # Title is printed on: "  title: '...'"
         title_prefix = f"{node_indent}  title: "
         width = self.wrap_length - len(title_prefix)
 
@@ -276,10 +266,11 @@ class YamlFormatter:
 # ---------------------------------------------------------------------------
 
 def extract_spec_tables(doc: pdfplumber.PDF) -> List[List[List[Any]]]:
-    """
-    Extract all tables from the PDF.
-    Returns a list of tables, each table is a list of rows,
-    each row is a list of cell values.
+    """Extract all tables from the PDF.
+
+    Returns:
+        A list of tables, where each table is a list of rows and each row
+        is a list of cell values.
     """
     tables: List[List[List[Any]]] = []
     for page in doc.pages:
@@ -290,9 +281,10 @@ def extract_spec_tables(doc: pdfplumber.PDF) -> List[List[List[Any]]]:
 
 
 def find_requirements_column_index(table: List[List[Any]]) -> Optional[int]:
-    """
-    Given a table, try to find the index of the 'Requirements and Testing Procedures' column.
-    Returns the column index if found, otherwise None.
+    """Find the index of the 'Requirements and Testing Procedures' column.
+
+    Returns:
+        The column index if found, otherwise None.
     """
     if not table:
         return None
@@ -308,10 +300,7 @@ def find_requirements_column_index(table: List[List[Any]]) -> Optional[int]:
 
 
 def should_ignore_cell_header(text: str) -> bool:
-    """
-    Return True if this cell contains column headers we want to skip
-    (e.g., Customized Approach Objective, Applicability Notes, etc.).
-    """
+    """Return True if this cell contains a header we want to skip."""
     ignore_pattern = re.compile(
         r'^(Customized Approach Objective|Applicability Notes|Defined Approach Requirements)\b',
         re.IGNORECASE,
@@ -324,8 +313,8 @@ def update_list_req(
     req_index: int,
     cell: Any
 ) -> int:
-    """
-    Update the list of requirement blobs with a new table cell.
+    """Update the list of requirement blobs with a new table cell.
+
     - If the cell starts with a requirement ID, start a new blob.
     - Otherwise, append to the current blob (if any).
     """
@@ -351,9 +340,9 @@ def update_list_req(
 
 
 def extract_requirement_blobs(tables: List[List[List[Any]]]) -> List[str]:
-    """
-    From all tables, extract concatenated requirement blobs from the
-    'Requirements and Testing Procedures' column.
+    """From all tables, extract concatenated requirement blobs.
+
+    Only the "Requirements and Testing Procedures" column is used.
     """
     list_req: List[str] = []
     req_index: int = -1
