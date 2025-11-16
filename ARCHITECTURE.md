@@ -1,111 +1,49 @@
-# ARCHITECTURE.md
+# Architecture – PCI DSS PDF Control Tree Parser
 
-## 1. Overview
+## Overview
 
-This document describes the architecture of the project:
+The parser extracts requirement data from the PCI DSS v4.0.1 PDF and
+converts it into a hierarchical control tree structure for further
+automation and reporting.
 
-- High-level purpose
-- Main components and their responsibilities
-- How data flows through the system
-- Integration points with external systems or services
+## Components
 
-> Customize this template to reflect the actual project.
+- **`ComplianceControlNode`**  
+  Represents an individual PCI DSS requirement with:
+  - `id` – Parsed requirement identifier (e.g., `1.1.1`, `A2.1.2`).
+  - `title` – A cleaned, single-line title derived from the
+    "Requirements and Testing Procedures" text.
+  - `children` – Child requirements in the hierarchy.
 
----
+- **`ComplianceControlTree`**  
+  Maintains the root node and uses requirement ID segment depth to
+  build the hierarchy (e.g., `1` → `1.1` → `1.1.1`).
 
-## 2. High-Level Purpose
+- **`YamlFormatter`**  
+  Walks the tree and renders YAML output including a standard PCI DSS
+  header and properly indented titles.
 
-**Project Name:** _[Insert Project Name]_  
+- **PDF Processing Helpers**  
+  Functions such as `extract_spec_tables`, `find_requirements_column_index`,
+  and `extract_requirement_blobs` isolate PDF- and table-specific logic.
 
-**Description:**  
-_[Brief, human explanation of what this project does and why it exists.]_
+## Data Flow
 
----
+1. **PDF Load** – `pdfplumber.open()` loads the PCI DSS PDF.
+2. **Table Extraction** – `extract_spec_tables()` collects tables from all pages.
+3. **Column Detection** – `find_requirements_column_index()` finds the
+   "Requirements and Testing Procedures" column.
+4. **Blob Concatenation** – `extract_requirement_blobs()` merges table cells
+   into requirement text blobs keyed by requirement ID.
+5. **Tree Build** – `ComplianceControlTree.add_node_from_blob()` parses
+   IDs and titles and attaches nodes based on depth.
+6. **Output** – `YamlFormatter` or JSON serialization produce structured
+   output for downstream tooling.
 
-## 3. Directory Structure
+## Security & Compliance Considerations
 
-Update with the real layout. Example:
-
-```text
-.
-├── src/
-│   ├── api/
-│   ├── core/
-│   ├── models/
-│   └── utils/
-├── tests/
-├── docs/
-└── scripts/
-```
-
-Explain each top-level directory and its role.
-
----
-
-## 4. Components & Responsibilities
-
-Break down key components and what they own. Include:
-
-- API or interface layer
-- Core/domain logic
-- Data access/persistence
-- Utilities or shared libraries
-
----
-
-## 5. Data Flow
-
-Describe how data moves through the system. Include:
-
-- Request/response paths
-- Background jobs or workers
-- Event-driven behavior, if any
-
----
-
-## 6. Configuration & Environment
-
-Document how configuration works:
-
-- Environment variables
-- Config files
-- Any environment-specific behavior
-
-Note that secrets should not be committed to the repo.
-
----
-
-## 7. Logging, Monitoring, and Error Handling
-
-Describe:
-
-- How and where logging happens
-- What is logged and at what level
-- How errors are surfaced or handled globally
-- Any monitoring/alerting hooks
-
----
-
-## 8. Security Considerations
-
-Call out any key security-related aspects:
-
-- Authentication/authorization
-- Sensitive data handling
-- Network or boundary protections
-
----
-
-## 9. Extensibility & Future Work
-
-Document:
-
-- Areas likely to grow or change
-- Known limitations
-- Planned improvements or refactors
-
----
-
-## 10. Glossary
-
-Define important domain terms and abbreviations to help readers navigate the project.
+- The parser handles **public standard PDFs only** and should never be
+  fed sensitive customer or transaction data.
+- All outputs are **draft artifacts** and must be reviewed and validated
+  by human assessors.
+- See `docs/SECURITY_STANDARDS.md` for secure development and usage guidance.
