@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=69.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pci-dss-pdf-control-tree-parser"
+version = "1.0.0"
+description = "Parses PCI DSS v4.0.1 PDF requirements into a hierarchical control tree (YAML/JSON)."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+
+authors = [
+  { name = "Scott Norton", email = "support@scottnorton.io" }
+]
+
+dependencies = [
+  "pdfplumber>=0.11.0,<1.0.0"
+]
+
+keywords = ["pci", "pci-dss", "compliance", "parser", "pdf", "yaml", "json"]
+
+[project.urls]
+Homepage = "https://github.com/scottnorton-io/PCI-DSS-PDF-Control-Tree-Parser"
+Source = "https://github.com/scottnorton-io/PCI-DSS-PDF-Control-Tree-Parser"
+Issues = "https://github.com/scottnorton-io/PCI-DSS-PDF-Control-Tree-Parser/issues"
+
+[project.scripts]
+pci-dss-parse = "pci_dss_pdf_control_tree_parser.pci_dss_parser:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
